@@ -6,6 +6,7 @@ toolchain go1.22.11
 
 require (
 	github.com/envoyproxy/go-control-plane/envoy v1.32.3
+	github.com/fsnotify/fsnotify v1.8.0
 	github.com/open-policy-agent/opa v1.0.1
 	google.golang.org/grpc v1.70.0
 )

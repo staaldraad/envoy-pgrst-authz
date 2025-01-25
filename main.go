@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	auth_pb "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
+	"github.com/fsnotify/fsnotify"
 	"github.com/open-policy-agent/opa/v1/rego"
 	"google.golang.org/grpc"
 )
@@ -58,7 +59,6 @@ func (server *AuthServer) Check(ctx context.Context, request *auth_pb.CheckReque
 		parsedInput.Method = "DELETE"
 	}
 
-	fmt.Println(parsedInput)
 	rs, err := server.pq.Eval(ctx, rego.EvalInput(parsedInput))
 	if err != nil {
 		fmt.Println(err)
@@ -96,13 +96,8 @@ func parsePath(path string) ParsedInput {
 	return parsedInput
 }
 
-func main() {
-	endPoint := fmt.Sprintf("localhost:%d", 3001)
-	listen, _ := net.Listen("tcp", endPoint)
-
+func loadRego(path string) (rego.PreparedEvalQuery, error) {
 	ctx := context.Background()
-	grpcServer := grpc.NewServer()
-
 	// load rego
 	authzFile, err := os.Open("auth.rego")
 	if err != nil {
@@ -124,11 +119,62 @@ func main() {
 
 	if err != nil {
 		fmt.Println(err)
-		return
+		return pq, err
+	}
+	return pq, nil
+}
+
+func watchRego(server *AuthServer) {
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		fmt.Println("ERROR", err)
+	}
+	defer watcher.Close()
+
+	//
+	done := make(chan bool)
+
+	//
+	go func() {
+		for {
+			select {
+			// watch for events
+			case event := <-watcher.Events:
+				if event.Op.String() == "WRITE" {
+					// reload the file
+					pq, _ := loadRego("auth.rego")
+					server.pq = pq
+				}
+				// watch for errors
+			case err := <-watcher.Errors:
+				fmt.Println("ERROR", err)
+			}
+		}
+	}()
+
+	// out of the box fsnotify can watch a single file, or a single directory
+	if err := watcher.Add("auth.rego"); err != nil {
+		fmt.Println("ERROR", err)
 	}
 
+	pq, _ := loadRego("auth.rego")
+	server.pq = pq
+	<-done
+}
+
+func main() {
+	endPoint := fmt.Sprintf("localhost:%d", 3001)
+	listen, _ := net.Listen("tcp", endPoint)
+
+	grpcServer := grpc.NewServer()
+
 	// register envoy proto server
-	server := &AuthServer{pq}
+	server := &AuthServer{}
+
+	// load rego and keep watching for changes
+	go watchRego(server)
+
 	auth_pb.RegisterAuthorizationServer(grpcServer, server)
 
 	fmt.Println("Server started at port 3001")

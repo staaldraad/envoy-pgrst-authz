@@ -15,9 +15,11 @@ deny if {
 }
 
 selects_id if {
+  input.table == "apix"
   input.select[_] == "id"
 }
 
 selects_all if {
+    input.table == "apix"
     input.select == null
 }
