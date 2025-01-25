@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/url"
 	"os"
 	"strings"
 
@@ -34,23 +35,8 @@ func (server *AuthServer) Check(ctx context.Context, request *auth_pb.CheckReque
 	// block if path is /private
 	path := request.Attributes.Request.Http.Path[1:]
 
-	parsedInput := ParsedInput{Path: path}
-	query := strings.Split(path, "?")
-	parsedInput.Table = query[0]
-	if len(query) > 1 {
-		// split path on `&`
-		parts := strings.Split(query[1], "&")
-		// find select
-		for _, p := range parts {
-			sp := strings.Split(p, "=")
-			if len(sp) > 0 {
-				switch sp[0] {
-				case "select":
-					parsedInput.Select = strings.Split(sp[1], ",")
-				}
-			}
-		}
-	}
+	parsedInput := parsePath(path)
+
 	rs, err := server.pq.Eval(ctx, rego.EvalInput(parsedInput))
 	if err != nil {
 		fmt.Println(err)
@@ -67,6 +53,20 @@ func (server *AuthServer) Check(ctx context.Context, request *auth_pb.CheckReque
 			OkResponse: &auth_pb.OkHttpResponse{},
 		},
 	}, nil
+}
+
+func parsePath(path string) ParsedInput {
+	parsedInput := ParsedInput{Path: path}
+	u, _ := url.Parse(path)
+	query := u.Query()
+	parsedInput.Table = u.Path
+	for q, p := range query {
+		switch q {
+		case "select":
+			parsedInput.Select = strings.Split(p[0], ",")
+		}
+	}
+	return parsedInput
 }
 
 func main() {
