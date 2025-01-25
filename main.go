@@ -24,6 +24,7 @@ type ParsedInput struct {
 	Table      string   `json:"table"`
 	Select     []string `json:"select"`
 	Conditions string   `json:"conditions"`
+	Method     string   `json:"method"`
 }
 
 type Allowed struct {
@@ -37,6 +38,27 @@ func (server *AuthServer) Check(ctx context.Context, request *auth_pb.CheckReque
 
 	parsedInput := parsePath(path)
 
+	// add method
+	switch request.Attributes.Request.Http.Method {
+	case "GET":
+		parsedInput.Method = "SELECT"
+	case "POST":
+		parsedInput.Method = "INSERT"
+		// check if INSERT or UPSERT POST
+		if h, ok := request.Attributes.Request.Http.Headers["prefer"]; ok {
+			if h == "resolution=merge-duplicates" {
+				parsedInput.Method = "UPSERT"
+			}
+		}
+	case "PATCH":
+		parsedInput.Method = "UPDATE"
+	case "PUT":
+		parsedInput.Method = "UPSERT"
+	case "DELETE":
+		parsedInput.Method = "DELETE"
+	}
+
+	fmt.Println(parsedInput)
 	rs, err := server.pq.Eval(ctx, rego.EvalInput(parsedInput))
 	if err != nil {
 		fmt.Println(err)
