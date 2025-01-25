@@ -63,7 +63,12 @@ func parsePath(path string) ParsedInput {
 	for q, p := range query {
 		switch q {
 		case "select":
-			parsedInput.Select = strings.Split(p[0], ",")
+			columns := strings.Split(p[0], ",")
+			// remove casting
+			for k, v := range columns {
+				columns[k] = strings.SplitN(v, "::", 2)[0]
+			}
+			parsedInput.Select = columns
 		}
 	}
 	return parsedInput
