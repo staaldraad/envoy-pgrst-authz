@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -9,7 +10,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"time"
 
 	auth_pb "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/fsnotify/fsnotify"
@@ -19,7 +19,8 @@ import (
 )
 
 type AuthServer struct {
-	pq rego.PreparedEvalQuery
+	pq         rego.PreparedEvalQuery
+	hmacSecret []byte
 }
 
 type ParsedInput struct {
@@ -36,30 +37,17 @@ type Allowed struct {
 	Reason  string `json:"reason,omitempty"`
 }
 
-var hmacSecret []byte = []byte("my_secret_key")
-
 func (server *AuthServer) Check(ctx context.Context, request *auth_pb.CheckRequest) (*auth_pb.CheckResponse, error) {
 
 	path := request.Attributes.Request.Http.Path[1:]
-
 	parsedInput := parsePath(path)
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"foo":  "bar",
-		"nbf":  time.Date(2015, 10, 10, 12, 0, 0, 0, time.UTC).Unix(),
-		"role": "anon",
-	})
-
-	// Sign and get the complete encoded token as a string using the secret
-	tokenString, err := token.SignedString(hmacSecret)
-
-	fmt.Println(tokenString, err)
-	// validate token
-	jwt, err := validateToken(tokenString) //(request.Attributes.Request.Http.Headers["authorization"])
-	fmt.Println(jwt, err)
-	if err == nil && jwt != nil {
-		parsedInput.Jwt = jwt
-		fmt.Println(parsedInput)
+	if authString, ok := request.Attributes.Request.Http.Headers["authorization"]; ok {
+		// validate token
+		jwt, err := validateToken(authString, server.hmacSecret)
+		if err == nil && jwt != nil {
+			parsedInput.Jwt = jwt
+		}
 	}
 
 	// add method
@@ -89,7 +77,7 @@ func (server *AuthServer) Check(ctx context.Context, request *auth_pb.CheckReque
 	}
 
 	if rs[0].Expressions[0].Value == false {
-		fmt.Println("blocked private request")
+		fmt.Println("blocked request by policy")
 		return nil, fmt.Errorf("request not allowed")
 	}
 
@@ -100,7 +88,7 @@ func (server *AuthServer) Check(ctx context.Context, request *auth_pb.CheckReque
 	}, nil
 }
 
-func validateToken(tokenString string) (jwt.MapClaims, error) {
+func validateToken(tokenString string, hmacSecret []byte) (jwt.MapClaims, error) {
 	// remove bearer keyword if present
 	if ts := strings.Split(tokenString, " "); len(ts) == 2 {
 		tokenString = ts[1]
@@ -215,8 +203,16 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 
+	hmacSecretPtr := flag.String("hmac", "", "a secret to sign the jwt")
+	flag.Parse()
+
+	if *hmacSecretPtr == "" {
+		fmt.Println("requires --hmac value")
+		return
+	}
+
 	// register envoy proto server
-	server := &AuthServer{}
+	server := &AuthServer{hmacSecret: []byte(*hmacSecretPtr)}
 
 	// load rego and keep watching for changes
 	go watchRego(server)
