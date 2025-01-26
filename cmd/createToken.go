@@ -20,7 +20,7 @@ func main() {
 	}
 	// create jwt for testing with
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"foo":  "bar",
+		"id":   "bar",
 		"nbf":  time.Date(2025, 01, 25, 12, 0, 0, 0, time.UTC).Unix(),
 		"role": *rolePtr,
 	})
