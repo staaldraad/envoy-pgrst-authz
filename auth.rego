@@ -3,7 +3,15 @@ package authz
 default allow := false
 
 allow if {
+    is_service_role
+}
+
+allow if {
 	not deny
+}
+
+is_service_role if {
+    input.jwt.role == "service_role"
 }
 
 deny if {

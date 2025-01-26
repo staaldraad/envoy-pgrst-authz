@@ -9,9 +9,11 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	auth_pb "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/fsnotify/fsnotify"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/open-policy-agent/opa/v1/rego"
 	"google.golang.org/grpc"
 )
@@ -21,11 +23,12 @@ type AuthServer struct {
 }
 
 type ParsedInput struct {
-	Path       string   `json:"path"`
-	Table      string   `json:"table"`
-	Select     []string `json:"select"`
-	Conditions string   `json:"conditions"`
-	Method     string   `json:"method"`
+	Path       string                 `json:"path"`
+	Table      string                 `json:"table"`
+	Select     []string               `json:"select"`
+	Conditions string                 `json:"conditions"`
+	Method     string                 `json:"method"`
+	Jwt        map[string]interface{} `json:"jwt"`
 }
 
 type Allowed struct {
@@ -33,11 +36,31 @@ type Allowed struct {
 	Reason  string `json:"reason,omitempty"`
 }
 
+var hmacSecret []byte = []byte("my_secret_key")
+
 func (server *AuthServer) Check(ctx context.Context, request *auth_pb.CheckRequest) (*auth_pb.CheckResponse, error) {
-	// block if path is /private
+
 	path := request.Attributes.Request.Http.Path[1:]
 
 	parsedInput := parsePath(path)
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"foo":  "bar",
+		"nbf":  time.Date(2015, 10, 10, 12, 0, 0, 0, time.UTC).Unix(),
+		"role": "anon",
+	})
+
+	// Sign and get the complete encoded token as a string using the secret
+	tokenString, err := token.SignedString(hmacSecret)
+
+	fmt.Println(tokenString, err)
+	// validate token
+	jwt, err := validateToken(tokenString) //(request.Attributes.Request.Http.Headers["authorization"])
+	fmt.Println(jwt, err)
+	if err == nil && jwt != nil {
+		parsedInput.Jwt = jwt
+		fmt.Println(parsedInput)
+	}
 
 	// add method
 	switch request.Attributes.Request.Http.Method {
@@ -77,6 +100,29 @@ func (server *AuthServer) Check(ctx context.Context, request *auth_pb.CheckReque
 	}, nil
 }
 
+func validateToken(tokenString string) (jwt.MapClaims, error) {
+	// remove bearer keyword if present
+	if ts := strings.Split(tokenString, " "); len(ts) == 2 {
+		tokenString = ts[1]
+	}
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Don't forget to validate the alg is what you expect:
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+
+		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
+		return hmacSecret, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		return claims, nil
+	}
+	return nil, nil
+}
+
 func parsePath(path string) ParsedInput {
 	parsedInput := ParsedInput{Path: path}
 	u, _ := url.Parse(path)
@@ -99,7 +145,7 @@ func parsePath(path string) ParsedInput {
 func loadRego(path string) (rego.PreparedEvalQuery, error) {
 	ctx := context.Background()
 	// load rego
-	authzFile, err := os.Open("auth.rego")
+	authzFile, err := os.Open(path)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
 	}
