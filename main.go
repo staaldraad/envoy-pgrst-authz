@@ -24,12 +24,13 @@ type AuthServer struct {
 }
 
 type ParsedInput struct {
-	Path    string                 `json:"path"`
-	Table   string                 `json:"table"`
-	Select  []string               `json:"select"`
-	Filters map[string]string      `json:"filters"`
-	Method  string                 `json:"method"`
-	Jwt     map[string]interface{} `json:"jwt"`
+	Path     string                 `json:"path"`
+	Table    string                 `json:"table"`
+	Function string                 `json:"function"`
+	Select   []string               `json:"select"`
+	Filters  map[string]string      `json:"filters"`
+	Method   string                 `json:"method"`
+	Jwt      map[string]interface{} `json:"jwt"`
 }
 
 type Allowed struct {
@@ -115,7 +116,12 @@ func parsePath(path string) ParsedInput {
 	parsedInput := ParsedInput{Path: path, Filters: make(map[string]string)}
 	u, _ := url.Parse(path)
 	query := u.Query()
-	parsedInput.Table = u.Path
+	if strings.HasPrefix(u.Path, "rpc/") {
+		parsedInput.Function = strings.Split(u.Path, "/")[1]
+	} else {
+		parsedInput.Table = u.Path
+	}
+
 	for q, p := range query {
 		switch q {
 		case "select":
