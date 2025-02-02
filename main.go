@@ -18,16 +18,6 @@ type AuthServer struct {
 	policyEngine policyengine.PolicyEngine
 }
 
-type ParsedInput struct {
-	Path     string                 `json:"path"`
-	Table    string                 `json:"table"`
-	Function string                 `json:"function"`
-	Select   []string               `json:"select"`
-	Filters  map[string]string      `json:"filters"`
-	Method   string                 `json:"method"`
-	Jwt      map[string]interface{} `json:"jwt"`
-}
-
 type Allowed struct {
 	Allowed bool   `json:"allow"`
 	Reason  string `json:"reason,omitempty"`
@@ -84,7 +74,7 @@ func main() {
 	case "opa":
 		policyEngine = &policyengine.OpaEngine{}
 	case "cedar":
-		policyEngine = &policyengine.OpaEngine{}
+		policyEngine = &policyengine.CedarEngine{}
 	default:
 		fmt.Printf("unknown policy engine %s\n", *enginePtr)
 		return

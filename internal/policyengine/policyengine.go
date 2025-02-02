@@ -3,6 +3,7 @@ package policyengine
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
 	auth_pb "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
@@ -12,6 +13,45 @@ import (
 type PolicyEngine interface {
 	AuthzRequest(context.Context, *auth_pb.CheckRequest, []byte) (ok bool, err error) // takes a request and turns into the input expected by the policy engine
 	LoadPolicy([]byte) error                                                          // loads the policy
+}
+
+type ParsedInput struct {
+	Path     string                 `json:"path"`
+	Table    string                 `json:"table"`
+	Function string                 `json:"function"`
+	Select   []string               `json:"select"`
+	Filters  map[string]string      `json:"filters"`
+	Method   string                 `json:"method"`
+	Jwt      map[string]interface{} `json:"jwt"`
+}
+
+func parsePath(hmacSecret []byte, request *auth_pb.AttributeContext_Request) ParsedInput {
+	path := request.Http.Path[1:]
+	parsedInput := ParsedInput{Path: path, Filters: make(map[string]string)}
+	u, _ := url.Parse(path)
+	query := u.Query()
+	if strings.HasPrefix(u.Path, "rpc/") {
+		parsedInput.Function = strings.Split(u.Path, "/")[1]
+	} else {
+		parsedInput.Table = u.Path
+	}
+
+	for q, p := range query {
+		switch q {
+		case "select":
+			columns := strings.Split(p[0], ",")
+			// remove casting
+			for k, v := range columns {
+				columns[k] = strings.SplitN(v, "::", 2)[0]
+			}
+			parsedInput.Select = columns
+		default:
+			parsedInput.Filters[q] = p[0]
+		}
+	}
+	parsedInput.Method = extractSQLMethod(request.Http.Method, request.Http.Headers)
+	parsedInput.Jwt = extractJWT(hmacSecret, request.Http.Headers)
+	return parsedInput
 }
 
 func extractJWT(hmacSecret []byte, headers map[string]string) jwt.MapClaims {

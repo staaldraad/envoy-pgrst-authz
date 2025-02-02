@@ -5,12 +5,15 @@ go 1.22.7
 toolchain go1.22.11
 
 require (
+	github.com/cedar-policy/cedar-go v1.1.0
 	github.com/envoyproxy/go-control-plane/envoy v1.32.3
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/golang-jwt/jwt/v4 v4.5.1
 	github.com/open-policy-agent/opa v1.0.1
 	google.golang.org/grpc v1.70.0
 )
+
+require golang.org/x/exp v0.0.0-20240222234643-814bf88cf225 // indirect
 
 require (
 	github.com/OneOfOne/xxhash v1.2.8 // indirect
