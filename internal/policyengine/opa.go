@@ -12,7 +12,7 @@ type OpaEngine struct {
 	preparedQuery rego.PreparedEvalQuery
 }
 
-func (oe *OpaEngine) Init() error {
+func (oe *OpaEngine) Init(config PoliceEngineConfig) error {
 	return nil
 }
 

@@ -24,7 +24,7 @@ type EntityDef struct {
 	ID   string `json:"id"`
 }
 
-func (ce *CedarEngine) Init() error {
+func (ce *CedarEngine) Init(config PoliceEngineConfig) error {
 	return nil
 }
 

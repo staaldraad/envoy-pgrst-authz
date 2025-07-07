@@ -17,35 +17,46 @@ type V8Engine struct {
 	CompiledScript *v8go.UnboundScript
 	RawScript      []byte
 	IsolatePool    *puddle.Pool
+	Config         PoliceEngineConfig
 }
 
-func (v8e *V8Engine) Init() error {
-	// create an isolates pool to allow multiple isolates
-	// to be pre created. This avoids cold starts and keeps
-	// script execution fast
-	maxPoolSize := int32(runtime.NumCPU())
-	constructor := func(context.Context) (any, error) {
-		iso := v8go.NewIsolate()
-		return iso, nil // creates a new JVM
-	}
-	destructor := func(value any) {
-		value.(*v8go.Isolate).Dispose() // clean things up, release memory
-	}
+func (v8e *V8Engine) Init(config PoliceEngineConfig) error {
+	v8e.Config = config
+	if config.UsePool {
+		// create an isolates pool to allow multiple isolates
+		// to be pre created. This avoids cold starts and keeps
+		// script execution fast
+		maxPoolSize := int32(runtime.NumCPU())
+		constructor := func(context.Context) (any, error) {
+			iso := v8go.NewIsolate()
+			return iso, nil // creates a new JVM
+		}
+		destructor := func(value any) {
+			value.(*v8go.Isolate).Dispose() // clean things up, release memory
+		}
 
-	v8e.IsolatePool = puddle.NewPool(constructor, destructor, maxPoolSize)
+		v8e.IsolatePool = puddle.NewPool(constructor, destructor, maxPoolSize)
+
+		fmt.Printf("V8 Engine intialised with pool of %d Isolates\n", maxPoolSize)
+	}
 	return nil
 }
 
 func (v8e *V8Engine) AuthzRequest(ctx context.Context, request *auth_pb.CheckRequest, hmacSecret []byte) (ok bool, err error) {
 	parsedInput := parsePath(hmacSecret, request.Attributes.Request)
 	start := time.Now()
+	var iso *v8go.Isolate
 
-	// get an isolate from the IsolatePool
-	// res, _ := v8e.IsolatePool.Acquire(context.Background())
-	// defer res.Release() // should always release the isolate back to the pool
-	// iso := res.Value().(*v8go.Isolate)
-	iso := v8go.NewIsolate()
-	defer iso.Dispose()
+	if v8e.Config.UsePool {
+		// get an isolate from the IsolatePool
+		res, _ := v8e.IsolatePool.Acquire(context.Background())
+		defer res.Release() // should always release the isolate back to the pool
+		iso = res.Value().(*v8go.Isolate)
+	} else {
+		iso = v8go.NewIsolate()
+		defer iso.Dispose()
+	}
+
 	v8ctx := v8go.NewContext(iso)
 	if v8ctx == nil {
 		fmt.Printf("unable to create context for request")

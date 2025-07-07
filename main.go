@@ -57,6 +57,7 @@ func main() {
 	hmacSecretPtr := flag.String("hmac", "", "a secret to sign the jwt")
 	pathPtr := flag.String("path", "", "path to the policy file to use")
 	enginePtr := flag.String("engine", "opa", "the policy engine to use [opa, cedar, v8]")
+	isolatePoolPtr := flag.Bool("pool", false, "use a pool of Isolates for v8 requests")
 	flag.Parse()
 
 	if *pathPtr == "" {
@@ -83,7 +84,7 @@ func main() {
 	}
 
 	// perform any initialization required by the engine
-	policyEngine.Init()
+	policyEngine.Init(policyengine.PoliceEngineConfig{UsePool: *isolatePoolPtr})
 	// load rego and keep watching for changes
 	go internal.WatchFile(*pathPtr, policyEngine)
 
