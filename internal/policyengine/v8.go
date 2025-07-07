@@ -9,15 +9,52 @@ import (
 	"time"
 
 	auth_pb "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
-	"github.com/jackc/puddle"
 	"github.com/tommie/v8go"
 )
 
 type V8Engine struct {
 	CompiledScript *v8go.UnboundScript
 	RawScript      []byte
-	IsolatePool    *puddle.Pool
-	Config         PoliceEngineConfig
+	//IsolatePool    *puddle.Pool
+	Config      PoliceEngineConfig
+	IsolatePool *IsolatePool
+}
+
+type IsolatePool struct {
+	pool chan *PooledIsolate
+}
+
+type PooledIsolate struct {
+	Isolate  *v8go.Isolate
+	UseCount int
+}
+
+func NewIsolatePool(size int) *IsolatePool {
+	pool := make(chan *PooledIsolate, size)
+
+	for range size {
+		iso := v8go.NewIsolate()
+		pool <- &PooledIsolate{Isolate: iso, UseCount: 0}
+	}
+
+	return &IsolatePool{pool: pool}
+}
+
+func (ip *IsolatePool) Acquire() *PooledIsolate {
+	piso := <-ip.pool
+	piso.UseCount++
+	return piso
+}
+func (ip *IsolatePool) Release(piso *PooledIsolate) {
+	if piso.UseCount > 5 {
+		// dispose of the isolate and create a new one
+		piso.Isolate.Dispose()
+		iso := v8go.NewIsolate()
+		ip.pool <- &PooledIsolate{Isolate: iso, UseCount: 0}
+	} else {
+		ip.pool <- piso // return it
+	}
+
 }
 
 func (v8e *V8Engine) Init(config PoliceEngineConfig) error {
@@ -27,16 +64,7 @@ func (v8e *V8Engine) Init(config PoliceEngineConfig) error {
 		// to be pre created. This avoids cold starts and keeps
 		// script execution fast
 		maxPoolSize := int32(runtime.NumCPU())
-		constructor := func(context.Context) (any, error) {
-			iso := v8go.NewIsolate()
-			return iso, nil // creates a new JVM
-		}
-		destructor := func(value any) {
-			value.(*v8go.Isolate).Dispose() // clean things up, release memory
-		}
-
-		v8e.IsolatePool = puddle.NewPool(constructor, destructor, maxPoolSize)
-
+		v8e.IsolatePool = NewIsolatePool(runtime.NumCPU())
 		fmt.Printf("V8 Engine intialised with pool of %d Isolates\n", maxPoolSize)
 	}
 	return nil
@@ -49,9 +77,9 @@ func (v8e *V8Engine) AuthzRequest(ctx context.Context, request *auth_pb.CheckReq
 
 	if v8e.Config.UsePool {
 		// get an isolate from the IsolatePool
-		res, _ := v8e.IsolatePool.Acquire(context.Background())
-		defer res.Release() // should always release the isolate back to the pool
-		iso = res.Value().(*v8go.Isolate)
+		piso := v8e.IsolatePool.Acquire()
+		iso = piso.Isolate
+		defer v8e.IsolatePool.Release(piso) // return it
 	} else {
 		iso = v8go.NewIsolate()
 		defer iso.Dispose()
