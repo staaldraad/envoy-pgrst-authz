@@ -13,6 +13,7 @@ import (
 type PolicyEngine interface {
 	AuthzRequest(context.Context, *auth_pb.CheckRequest, []byte) (ok bool, err error) // takes a request and turns into the input expected by the policy engine
 	LoadPolicy([]byte) error                                                          // loads the policy
+	Init() error                                                                      // does  any necessary initialization
 }
 
 type ParsedInput struct {

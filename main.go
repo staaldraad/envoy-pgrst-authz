@@ -56,7 +56,7 @@ func main() {
 
 	hmacSecretPtr := flag.String("hmac", "", "a secret to sign the jwt")
 	pathPtr := flag.String("path", "", "path to the policy file to use")
-	enginePtr := flag.String("engine", "opa", "the policy engine to use [opa, cedar]")
+	enginePtr := flag.String("engine", "opa", "the policy engine to use [opa, cedar, v8]")
 	flag.Parse()
 
 	if *pathPtr == "" {
@@ -75,10 +75,15 @@ func main() {
 		policyEngine = &policyengine.OpaEngine{}
 	case "cedar":
 		policyEngine = &policyengine.CedarEngine{}
+	case "v8":
+		policyEngine = &policyengine.V8Engine{}
 	default:
 		fmt.Printf("unknown policy engine %s\n", *enginePtr)
 		return
 	}
+
+	// perform any initialization required by the engine
+	policyEngine.Init()
 	// load rego and keep watching for changes
 	go internal.WatchFile(*pathPtr, policyEngine)
 
