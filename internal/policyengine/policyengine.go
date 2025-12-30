@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	auth_pb "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
-	"github.com/golang-jwt/jwt/v4"
 	"github.com/golang-jwt/jwt/v5"
 )
 
