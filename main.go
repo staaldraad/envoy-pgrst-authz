@@ -49,11 +49,8 @@ func (server *AuthServer) Check(ctx context.Context, request *auth_pb.CheckReque
 }
 
 func main() {
-	endPoint := fmt.Sprintf("localhost:%d", 3001)
-	listen, _ := net.Listen("tcp", endPoint)
 
-	grpcServer := grpc.NewServer()
-
+	portPtr := flag.Int("port", 3001, "a port to listen on")
 	hmacSecretPtr := flag.String("hmac", "", "a secret to sign the jwt")
 	pathPtr := flag.String("path", "", "path to the policy file to use")
 	enginePtr := flag.String("engine", "opa", "the policy engine to use [opa, cedar, v8]")
@@ -62,11 +59,6 @@ func main() {
 
 	if *pathPtr == "" {
 		fmt.Println("requires --path value")
-		return
-	}
-
-	if *hmacSecretPtr == "" {
-		fmt.Println("requires --hmac value")
 		return
 	}
 
@@ -94,8 +86,12 @@ func main() {
 		hmacSecret:   []byte(*hmacSecretPtr),
 	}
 
+	endPoint := fmt.Sprintf("localhost:%d", *portPtr)
+	listen, _ := net.Listen("tcp", endPoint)
+
+	grpcServer := grpc.NewServer()
 	auth_pb.RegisterAuthorizationServer(grpcServer, server)
 
-	fmt.Println("Server started at port 3001")
+	fmt.Printf("Server started at %s\n", endPoint)
 	grpcServer.Serve(listen)
 }

@@ -9,7 +9,7 @@ require (
 	github.com/envoyproxy/go-control-plane/envoy v1.32.3
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/golang-jwt/jwt/v4 v4.5.1
-	github.com/jackc/puddle v1.3.0
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/open-policy-agent/opa v1.0.1
 	github.com/tommie/v8go v0.33.0
 	google.golang.org/grpc v1.70.0
@@ -36,7 +36,6 @@ require (
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
-	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
