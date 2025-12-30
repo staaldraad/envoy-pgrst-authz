@@ -9,11 +9,21 @@ require (
 	github.com/envoyproxy/go-control-plane/envoy v1.32.3
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/golang-jwt/jwt/v4 v4.5.1
+	github.com/jackc/puddle v1.3.0
 	github.com/open-policy-agent/opa v1.0.1
+	github.com/tommie/v8go v0.33.0
 	google.golang.org/grpc v1.70.0
 )
 
-require golang.org/x/exp v0.0.0-20240222234643-814bf88cf225 // indirect
+require (
+	github.com/tommie/v8go/deps/android_amd64 v0.0.0-20250515043113-5dcc98077472 // indirect
+	github.com/tommie/v8go/deps/android_arm64 v0.0.0-20250515043113-5dcc98077472 // indirect
+	github.com/tommie/v8go/deps/darwin_amd64 v0.0.0-20250515043113-5dcc98077472 // indirect
+	github.com/tommie/v8go/deps/darwin_arm64 v0.0.0-20250515043113-5dcc98077472 // indirect
+	github.com/tommie/v8go/deps/linux_amd64 v0.0.0-20250515043113-5dcc98077472 // indirect
+	github.com/tommie/v8go/deps/linux_arm64 v0.0.0-20250515043113-5dcc98077472 // indirect
+	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225 // indirect
+)
 
 require (
 	github.com/OneOfOne/xxhash v1.2.8 // indirect

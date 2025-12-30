@@ -12,6 +12,10 @@ type OpaEngine struct {
 	preparedQuery rego.PreparedEvalQuery
 }
 
+func (oe *OpaEngine) Init(config PoliceEngineConfig) error {
+	return nil
+}
+
 func (oe *OpaEngine) AuthzRequest(ctx context.Context, request *auth_pb.CheckRequest, hmacSecret []byte) (ok bool, err error) {
 	parsedInput := parsePath(hmacSecret, request.Attributes.Request)
 	rs, err := oe.preparedQuery.Eval(ctx, rego.EvalInput(parsedInput))

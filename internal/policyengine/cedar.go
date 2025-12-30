@@ -24,6 +24,10 @@ type EntityDef struct {
 	ID   string `json:"id"`
 }
 
+func (ce *CedarEngine) Init(config PoliceEngineConfig) error {
+	return nil
+}
+
 func (ce *CedarEngine) AuthzRequest(ctx context.Context, request *auth_pb.CheckRequest, hmacSecret []byte) (ok bool, err error) { // takes a request and turns into the input expected by the policy engine
 
 	if ce.ps == nil {
